@@ -1,5 +1,6 @@
 #Import python modules
 import sys, os, re, shutil, random
+import subprocess
 
 import logging
 logger = logging.getLogger(__name__)
@@ -18,10 +19,13 @@ from functools import partial
 
 # import ui
 import ui
+import task_widget
 from rftool.utils import file_utils
 from rftool.utils import path_info
 from rftool.utils import sg_wrapper
 from rftool.utils import sg_process
+from rftool.utils import icon
+from rftool.utils import pipeline_utils
 from startup import config
 from rftool.utils.userCheck import user_app
 
@@ -110,6 +114,10 @@ class SGFileManager(QtGui.QMainWindow):
         # push button
         self.ui.open_pushButton.clicked.connect(self.open_file)
         self.ui.save_pushButton.clicked.connect(self.save_file)
+        self.ui.addEntity_pushButton.clicked.connect(self.create_entity)
+
+        # checkBox
+        self.ui.override_checkBox.stateChanged.connect(self.override_filename)
 
         # comboBox
         self.ui.project_comboBox.currentIndexChanged.connect(self.project_signal)
@@ -121,6 +129,11 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.ui2_listWidget.itemSelectionChanged.connect(self.ui2_signal)
         self.ui.entity_listWidget.itemSelectionChanged.connect(self.entity_listWidget_signal)
         self.ui.task_listWidget.itemSelectionChanged.connect(self.task_listWidget_signal)
+
+        # show menu
+        self.ui.entity_listWidget.customContextMenuRequested.connect(self.show_entity_menu)
+        self.ui.task_listWidget.customContextMenuRequested.connect(self.show_task_menu)
+        self.ui.file_listWidget.customContextMenuRequested.connect(self.show_file_menu)
 
         # filters
         self.ui.filter_checkBox.stateChanged.connect(self.filter1_signal)
@@ -241,8 +254,25 @@ class SGFileManager(QtGui.QMainWindow):
                 self.set_user_ui()
 
             if mode == 'check':
-                self.check_user('check')
+                if not dialog.ui.checkBox.isChecked():
+                    self.check_user('check')
 
+    def group_user(self):
+        groupDict = dict()
+        if self.sgUser:
+            for user in self.sgUser:
+                name = user['name']
+                groups = user['groups']
+
+                if groups:
+                    for group in groups:
+                        groupName = group['name']
+                        if not groupName in groupDict.keys():
+                            groupDict[groupName] = [{'name': name, 'id': user['id']}]
+                        else:
+                            groupDict[groupName].append({'name': name, 'id': user['id']})
+
+        return groupDict
 
     def apply_setting(self):
         ''' read setting from var and apply to ui options. set ui will trigger signal to run start_ui()'''
@@ -275,7 +305,11 @@ class SGFileManager(QtGui.QMainWindow):
 
         # add items
         self.ui.project_comboBox.clear()
-        self.ui.project_comboBox.addItems(projects)
+
+        for row, project in enumerate(sorted(self.sgProjects)):
+            self.ui.project_comboBox.addItem(project['name'])
+            self.ui.project_comboBox.setItemData(row, project, QtCore.Qt.UserRole)
+        # self.ui.project_comboBox.addItems(projects)
 
         # reconnect signal
         self.ui.project_comboBox.blockSignals(False)
@@ -327,6 +361,11 @@ class SGFileManager(QtGui.QMainWindow):
 
     def set_default_button(self):
         self.ui.save_pushButton.setEnabled(False)
+        self.ui.root_lineEdit.setEnabled(False)
+        self.ui.fileName_lineEdit.setEnabled(False)
+
+    def override_filename(self):
+        self.ui.fileName_lineEdit.setEnabled(self.ui.override_checkBox.isChecked())
 
 
     # signals
@@ -346,13 +385,14 @@ class SGFileManager(QtGui.QMainWindow):
         serverMode, sgMode = self.get_server_sg_ui()
         assetMode, sceneMode = self.get_mode_ui()
         # set root
-        # rootPath = os.environ.get(self.workspaces[self.workspaces.keys()[index]], 'Not found')
-        # self.ui.root_lineEdit.setText(rootPath)
+        rootPath = os.environ.get(self.workspaces[self.workspaces.keys()[index]], 'Not found')
+        self.ui.root_lineEdit.setText(rootPath)
 
         if sgMode:
             if assetMode:
                 if not self.firstStartUI:
-                    self.set_work_files()
+                    self.set_entity_ui(self.asset)
+                    # self.set_work_files()
 
     def ui1_signal(self):
         serverMode, sgMode = self.get_server_sg_ui()
@@ -452,6 +492,7 @@ class SGFileManager(QtGui.QMainWindow):
         assetTypes = [str(a.text()) for a in self.ui.ui1_listWidget.selectedItems()]
         subTypes = [str(a.text()) for a in self.ui.ui2_listWidget.selectedItems()]
         episodes = [self.ui.filter1_comboBox.itemData(self.ui.filter1_comboBox.currentIndex(), QtCore.Qt.UserRole)]
+        root = self.workspaces[str(self.ui.work_comboBox.currentText())]
 
         assetTypeFilter = []
         assetSubTypeFilter = []
@@ -495,6 +536,7 @@ class SGFileManager(QtGui.QMainWindow):
         filterAssets = [a for a in allAssets if a in assetTypeFilter and a in assetSubTypeFilter and a in episodeFilter]
         self.ui.entity_listWidget.clear()
         self.ui.task_listWidget.clear()
+        self.ui.file_listWidget.clear()
         self.ui.entity_listWidget.addItem('No Item')
 
 
@@ -502,18 +544,30 @@ class SGFileManager(QtGui.QMainWindow):
             # convert data to asset
             assetLists = sorted([sgAssetDict[a]['code'] for a in filterAssets])
             self.ui.entity_listWidget.clear()
+            self.ui.entity_listWidget.setSortingEnabled(True)
 
             for entityId in filterAssets:
                 item = QtGui.QListWidgetItem(self.ui.entity_listWidget)
                 item.setText(sgAssetDict[entityId]['code'])
                 item.setData(QtCore.Qt.UserRole, sgAssetDict[entityId])
+                iconPath = icon.nodir
+
+                asset = path_info.PathInfo(project=project, entity=mode, entitySub1=sgAssetDict[entityId]['sg_asset_type'], entitySub2=sgAssetDict[entityId]['sg_subtype'], name=sgAssetDict[entityId]['code'])
+
+                if os.path.exists(asset.entityPath(root=root)):
+                    iconPath = icon.dir
+
+                iconWidget = QtGui.QIcon()
+                iconWidget.addPixmap(QtGui.QPixmap(iconPath),QtGui.QIcon.Normal,QtGui.QIcon.Off)
+                item.setIcon(iconWidget)
 
             index = assetLists.index(selectItem) if selectItem in assetLists else 0
+            self.ui.entity_listWidget.sortItems()
             self.ui.entity_listWidget.setCurrentRow(index)
 
             self.set_path()
 
-    def set_asset_task(self):
+    def set_asset_task(self, sel=''):
         selectedItem = self.ui.entity_listWidget.currentItem()
         if selectedItem:
             if not str(selectedItem.text()) == 'No Item':
@@ -521,14 +575,34 @@ class SGFileManager(QtGui.QMainWindow):
                 tasks = sg_process.get_tasks(entity)
 
                 self.ui.task_listWidget.clear()
+                self.ui.file_listWidget.clear()
                 self.ui.task_listWidget.setSortingEnabled(True)
 
                 for task in tasks:
+                    taskIcon = config.sgIconMap.get(task['sg_status_list'])
+                    assignees = [a.get('name') for a in task['task_assignees']]
+                    assigneesStr = (',').join(assignees)
+
+                    taskWidget = task_widget.TaskWidget()
+                    taskWidget.set_text1(task['content'])
+                    taskWidget.set_icon(taskIcon)
+                    taskWidget.set_text2(assigneesStr)
+
                     item = QtGui.QListWidgetItem(self.ui.task_listWidget)
-                    item.setText('%s - %s - %s' % (task['content'], task['sg_status_list'], task['task_assignees']))
+                    item.setSizeHint(taskWidget.sizeHint())
+
+                    self.ui.task_listWidget.setItemWidget(item, taskWidget)
+                    # item = QtGui.QListWidgetItem(self.ui.task_listWidget)
+                    # item.setText('%s - %s' % (task['content'], task['task_assignees']))
                     item.setData(QtCore.Qt.UserRole, task)
 
+                    # iconWidget = QtGui.QIcon()
+                    # iconWidget.addPixmap(QtGui.QPixmap(taskIcon),QtGui.QIcon.Normal,QtGui.QIcon.Off)
+                    # item.setIcon(iconWidget)
+
                 self.ui.task_listWidget.sortItems()
+
+        self.ui.save_pushButton.setEnabled(False)
 
     def set_asset_step(self):
         selectedItem = self.ui.task_listWidget.currentItem()
@@ -556,12 +630,17 @@ class SGFileManager(QtGui.QMainWindow):
                 item.setText(eachFile)
                 item.setData(QtCore.Qt.UserRole, ('%s/%s' % (path, eachFile)))
 
+                iconWidget = QtGui.QIcon()
+                iconWidget.addPixmap(QtGui.QPixmap(icon.maya),QtGui.QIcon.Normal,QtGui.QIcon.Off)
+                item.setIcon(iconWidget)
+
             saveFilename = self.get_save_filename(path, asset)
 
         self.ui.file_listWidget.sortItems(QtCore.Qt.DescendingOrder)
         self.set_path(filename=saveFilename)
 
 
+    # utils
     def combine_path(self):
         mode = self.get_mode_ui(entity=True)
         project = str(self.ui.project_comboBox.currentText())
@@ -569,26 +648,20 @@ class SGFileManager(QtGui.QMainWindow):
         entityItem = self.ui.entity_listWidget.currentItem()
         entity = (entityItem.data(QtCore.Qt.UserRole) if entityItem else {})
         assetType = entity.get('sg_asset_type', '')
-        assetSubType = entity.get('sg_subtype', '')
+        assetSubType = entity.get('sg_subtype', '') if entity.get('sg_subtype') else ''
         name = entity.get('code', '')
 
         taskItem = self.ui.task_listWidget.currentItem()
         taskEntity = (taskItem.data(QtCore.Qt.UserRole) if taskItem else {})
 
         step = config.sgSteps.get(taskEntity.get('step', {}).get('name'), '')
-        print project
-        print mode
-        print assetType
-        print assetSubType
-        print name
-        print step
-
         asset = path_info.PathInfo(project=project, entity=mode, entitySub1=assetType, entitySub2=assetSubType, name=name, step=step)
 
         return asset
 
     def get_save_filename(self, path, asset):
-        filename = '{0}_v001_{1}.ma'.format(asset.assetName(step=True), mc.optionVar(q=config.localUser))
+        version = file_utils.find_next_version(file_utils.listFile(path))
+        filename = '{0}_{2}_{1}.ma'.format(asset.assetName(step=True), mc.optionVar(q=config.localUser), version)
         return os.path.basename(file_utils.increment_version('%s/%s' % (path, filename)))
 
 
@@ -602,12 +675,13 @@ class SGFileManager(QtGui.QMainWindow):
             self.ui.fileName_lineEdit.setText(filename)
 
         workspace = str(self.ui.work_comboBox.currentText())
-        self.ui.root_lineEdit.setText(path)
+        self.ui.path_lineEdit.setText(path)
 
         self.ui.save_pushButton.setEnabled(False)
         if os.path.exists(path_info.PathInfo(path).absPath):
             self.ui.save_pushButton.setEnabled(True)
 
+    # file commands
 
     def open_file(self):
         ''' open maya file '''
@@ -622,7 +696,7 @@ class SGFileManager(QtGui.QMainWindow):
 
     def save_file(self):
         root = self.workspaces[str(self.ui.work_comboBox.currentText())]
-        path = str(self.ui.root_lineEdit.text())
+        path = str(self.ui.path_lineEdit.text())
         asset = path_info.PathInfo(path)
         absPath = asset.absPath
         filename = str(self.ui.fileName_lineEdit.text())
@@ -633,3 +707,173 @@ class SGFileManager(QtGui.QMainWindow):
         self.set_work_files()
 
         return result
+
+    def create_entity(self):
+        assetMode, sceneMode = self.get_mode_ui()
+        root = self.workspaces[str(self.ui.work_comboBox.currentText())]
+
+        entityName = str(self.ui.entity_lineEdit.text())
+        entitySub1 = self.ui.ui1_listWidget.currentItem()
+        entitySub1 = str(entitySub1.text()) if entitySub1 else ''
+        entitySub1 = entitySub1 if not entitySub1 == 'all' else ''
+        entitySub2 = self.ui.ui2_listWidget.currentItem()
+        entitySub2 = str(entitySub2.text()) if entitySub2 else ''
+        entitySub2 = entitySub2 if not entitySub2 == 'all' else ''
+
+        projectEntity = self.ui.project_comboBox.itemData(self.ui.project_comboBox.currentIndex(), QtCore.Qt.UserRole)
+        episodeEntity = None
+        if self.ui.filter_checkBox.isChecked():
+            episodeEntity = self.ui.filter1_comboBox.itemData(self.ui.filter1_comboBox.currentIndex(), QtCore.Qt.UserRole)
+
+        if entitySub1 and entitySub2 and entityName:
+            if assetMode:
+                # check if not asset in Shotgun
+                if not entityName in [a['code'] for a in self.sgAssets]:
+                    title = 'Confirm'
+                    message = 'Create asset "%s" under type %s, subtype %s?' % (entityName, entitySub1, entitySub2)
+                    result = QtGui.QMessageBox.question(self, title, message, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Cancel)
+
+                    if result == QtGui.QMessageBox.Ok:
+                        sgResult = sg_process.create_asset(project=projectEntity, assetType=entitySub1, assetSubType=entitySub2, assetName=entityName, episode=episodeEntity, template='default')
+                        if sgResult:
+                            dirResult = pipeline_utils.create_asset_template(root, projectEntity['name'], entitySub1, entitySub2, entityName)
+
+                        self.sgAssets = None
+                        self.set_entity_ui(self.asset, selectItem=entityName)
+                        self.ui.entity_lineEdit.setText('')
+                else:
+                    QtGui.QMessageBox.warning(self, 'Warning', '%s already exists in Shotgun' % entityName)
+
+        else:
+            title = 'Error'
+            message = 'Name cannot be empty. Type and Subtype cannot be "all"'
+            QtGui.QMessageBox.warning(self, title, message, QtGui.QMessageBox.Ok)
+
+    # show menu
+    def show_entity_menu(self, pos):
+        ''' context menu for download repo '''
+        menu = QtGui.QMenu(self)
+        currentItem = self.ui.entity_listWidget.currentItem()
+        data = currentItem.data(QtCore.Qt.UserRole)
+
+        if currentItem:
+            menu.addAction('Open in Explorer')
+            menu.addAction('Create Directory')
+
+            menu.popup(self.ui.entity_listWidget.mapToGlobal(pos))
+            selMenuItem = menu.exec_(self.ui.entity_listWidget.mapToGlobal(pos))
+
+            self.menu_command('entity', data, selMenuItem)
+
+    def show_task_menu(self, pos):
+        ''' context menu for download repo '''
+        menu = QtGui.QMenu(self)
+        currentItem = self.ui.task_listWidget.currentItem()
+        data = currentItem.data(QtCore.Qt.UserRole)
+        taskEntity = currentItem.data(QtCore.Qt.UserRole)
+
+        if currentItem:
+            self.set_status_menu(menu, taskEntity)
+            self.set_assign_menu(menu, taskEntity)
+
+            menu.popup(self.ui.task_listWidget.mapToGlobal(pos))
+            selMenuItem = menu.exec_(self.ui.task_listWidget.mapToGlobal(pos))
+
+            # self.menu_command('task', data, selMenuItem)
+
+    def show_file_menu(self, pos):
+        menu = QtGui.QMenu(self)
+        currentItem = self.ui.file_listWidget.currentItem()
+        data = currentItem.data(QtCore.Qt.UserRole)
+
+        if currentItem:
+            menu.addAction('Open in Explorer')
+
+        menu.popup(self.ui.file_listWidget.mapToGlobal(pos))
+        selMenuItem = menu.exec_(self.ui.file_listWidget.mapToGlobal(pos))
+
+        self.menu_command('file', data, selMenuItem)
+
+
+    def set_status_menu(self, menu, taskEntity):
+        setStatusMenu = QtGui.QMenu('Set status', self)
+        setStatusMenu.triggered.connect(partial(self.set_task_status, taskEntity))
+
+        for sgIcon in config.sgIconMap.keys():
+            iconWidget = QtGui.QIcon()
+            iconWidget.addPixmap(QtGui.QPixmap(config.sgIconMap[sgIcon]),QtGui.QIcon.Normal,QtGui.QIcon.Off)
+            setStatusMenu.addAction(iconWidget, sgIcon)
+
+        menu.addMenu(setStatusMenu)
+
+    def set_assign_menu(self, menu, taskEntity):
+        userMenu = QtGui.QMenu('Assign to', self)
+        groupUsers = self.group_user()
+
+        for group in sorted(groupUsers.keys()):
+            groupMenu = QtGui.QMenu(group, userMenu)
+            users = groupUsers[group]
+            groupMenu.triggered.connect(partial(self.assign_user, taskEntity))
+
+            for user in users:
+                groupMenu.addAction('%s [%s]' % (user['name'], user['id']))
+
+            userMenu.addMenu(groupMenu)
+        menu.addMenu(userMenu)
+
+    def set_task_status(self, taskEntity, menuItem):
+        status = str(menuItem.text())
+        sgStatus = sg_process.set_task_status(taskEntity['id'], status)
+        self.set_asset_task()
+
+    def assign_user(self, taskEntity, menuItem):
+        name = str(menuItem.text())
+        userId = int(name.split('[')[-1].replace(']', ''))
+        result = sg_process.assign_task(taskEntity['id'], userId)
+        self.set_asset_task()
+
+
+    def menu_command(self, section, data, menuItem):
+        root = self.workspaces[str(self.ui.work_comboBox.currentText())]
+        project = str(self.ui.project_comboBox.currentText())
+
+        title = str(menuItem.text()) if menuItem else ''
+
+        if section == 'entity':
+            entity = data
+            asset = self.asset_object(entity)
+            if title == 'Open in Explorer':
+                entityPath = asset.entityPath(root=root)
+                if os.path.exists(entityPath) :
+                    entityPath = entityPath.replace('/', '\\')
+                    subprocess.Popen(r'explorer /select,"%s"' % entityPath)
+
+            if title == 'Create Directory':
+                pipeline_utils.create_asset_template(root, asset.project, asset.type, asset.subtype, asset.name)
+                self.sgAssets = None
+                index = self.ui.entity_listWidget.currentIndex()
+                self.set_entity_ui(self.asset)
+                self.ui.entity_listWidget.setCurrentIndex(index)
+
+        if section == 'task':
+            category = menuItem.parentWidget().title() if menuItem else ''
+            taskEntity = data
+            status = title
+            if category == 'Set status':
+                sgStatus = sg_process.set_task_status(taskEntity['id'], status)
+
+            self.set_asset_task()
+
+        if section == 'file':
+            path = item.data(QtCore.Qt.UserRole)
+            if title == 'Open in Explorer':
+                if os.path.exists(path) :
+                    path = path.replace('/', '\\')
+                    subprocess.Popen(r'explorer /select,"%s"' % path)
+
+    def asset_object(self, entity):
+        project = str(self.ui.project_comboBox.currentText())
+        mode = self.asset
+        return path_info.PathInfo(project=project, entity=mode, entitySub1=entity['sg_asset_type'], entitySub2=entity['sg_subtype'], name=entity['code'])
+
+
