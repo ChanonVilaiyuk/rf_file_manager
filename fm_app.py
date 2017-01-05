@@ -117,6 +117,8 @@ class SGFileManager(QtGui.QMainWindow):
         # push button
         self.ui.open_pushButton.clicked.connect(self.open_file)
         self.ui.save_pushButton.clicked.connect(self.save_file)
+        self.ui.addSub1_pushButton.clicked.connect(self.add_entity1)
+        self.ui.addSub2_pushButton.clicked.connect(self.add_entity2)
         self.ui.addEntity_pushButton.clicked.connect(self.create_entity)
 
         # checkBox
@@ -404,6 +406,9 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.status_comboBox.setVisible(False)
         self.ui.step_comboBox.setVisible(False)
         self.ui.dept_label.setVisible(False)
+        self.ui.entity_listWidget.setSortingEnabled(True)
+        self.ui.file_listWidget.setSortingEnabled(True)
+        self.ui.ui2_listWidget.setSortingEnabled(True)
 
     def override_filename(self):
         self.ui.fileName_lineEdit.setEnabled(self.ui.override_checkBox.isChecked())
@@ -636,7 +641,6 @@ class SGFileManager(QtGui.QMainWindow):
             # convert data to asset
             assetLists = sorted([sgAssetDict[a]['code'] for a in filterAssets])
             self.ui.entity_listWidget.clear()
-            self.ui.entity_listWidget.setSortingEnabled(True)
 
             for entityId in filterAssets:
                 item = QtGui.QListWidgetItem(self.ui.entity_listWidget)
@@ -687,6 +691,7 @@ class SGFileManager(QtGui.QMainWindow):
                 # self.ui.task_listWidget.setSortingEnabled(True)
 
                 for task in sorted(tasks):
+                    print task
                     taskIcon = config.sgIconMap.get(task['sg_status_list'])
                     assignees = [a.get('name') for a in task['task_assignees']]
                     assigneesStr = (',').join(assignees)
@@ -732,7 +737,7 @@ class SGFileManager(QtGui.QMainWindow):
         saveFilename = ''
 
         self.ui.file_listWidget.clear()
-        self.ui.file_listWidget.setSortingEnabled(True)
+
         if os.path.exists(path):
             files = file_utils.listFile(path)
 
@@ -763,20 +768,15 @@ class SGFileManager(QtGui.QMainWindow):
             entitySub1 = entity.get('sg_asset_type', '')
             entitySub2 = entity.get('sg_subtype', '') if entity.get('sg_subtype') else ''
             name = entity.get('code', '')
+
         if mode == self.scene:
-            entitySub1 = ''
-            entitySub2 = ''
-
-            if self.ui.ui1_listWidget.currentItem().data(QtCore.Qt.UserRole):
-                entitySub1 = self.ui.ui1_listWidget.currentItem().data(QtCore.Qt.UserRole).get('code')
-
-            if self.ui.ui2_listWidget.currentItem().data(QtCore.Qt.UserRole):
-                entitySub2 = self.ui.ui2_listWidget.currentItem().data(QtCore.Qt.UserRole).get('sg_shortcode')
-
+            entitySub1 = entity.get('sg_episode', {}).get('name', '')
+            entitySub2 = entity.get('sg_sequence.Sequence.sg_shortcode', '')
             name = entity.get('sg_shortcode', '')
 
         taskItem = self.ui.task_listWidget.currentItem()
         taskEntity = (taskItem.data(QtCore.Qt.UserRole) if taskItem else {})
+        print 'taskEntity', taskEntity
 
         step = config.sgSteps.get(taskEntity.get('step', {}).get('name'), 'None')
         asset = path_info.PathInfo(project=project, entity=mode, entitySub1=entitySub1, entitySub2=entitySub2, name=name, step=step)
@@ -817,6 +817,13 @@ class SGFileManager(QtGui.QMainWindow):
 
     # file commands
 
+    def set_scene_path(self):
+        project = str(self.ui.project_comboBox.currentText())
+        selEpisode = self.ui.ui1_listWidget.currentItem()
+        selSequence = self.ui.ui2_listWidget.currentItem()
+        selShot = self.ui.entity_listWidget.currentItem()
+        selTask = self.ui.task_listWidget.currentItem()
+
     def open_file(self):
         ''' open maya file '''
         selItem = self.ui.file_listWidget.currentItem()
@@ -842,6 +849,74 @@ class SGFileManager(QtGui.QMainWindow):
         self.set_work_files()
 
         return result
+
+    def add_entity1(self):
+        ''' create type for asset, create episode for scene '''
+        assetMode, sceneMode = self.get_mode_ui()
+        inputStr = str(self.ui.sub1_lineEdit.text())
+        root = str(self.ui.root_lineEdit.text())
+        projectEntity = self.ui.project_comboBox.itemData(self.ui.project_comboBox.currentIndex(), QtCore.Qt.UserRole)
+        # episodeEntity = self.ui.ui1_listWidget.currentItem().data(QtCore.Qt.UserRole)
+
+        if assetMode:
+            QtGui.QMessageBox.question(self, 'Warning', 'No working')
+            return
+            sg_process.add_list_field(inputStr, 'sg_asset_type')
+            self.ui.ui1_listWidget.blockSignals(True)
+            self.set_type_ui()
+            self.ui.ui1_listWidget.blockSignals(False)
+
+        if sceneMode:
+            result = QtGui.QMessageBox.question(self, 'Create episode?', 'Create episode %s?' % inputStr, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Cancel)
+
+            if result == QtGui.QMessageBox.Ok:
+                sgResult = sg_process.create_episode(projectEntity, inputStr)
+
+                if sgResult:
+                    shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=inputStr)
+                    episodePath = shot.entity1Path()
+
+                    if not os.path.exists(episodePath):
+                        os.makedirs(episodePath)
+
+                    self.sg_set_episode_ui()
+                    self.ui.sub1_lineEdit.setText('')
+
+
+    def add_entity2(self):
+        ''' create type for asset, create episode for scene '''
+        assetMode, sceneMode = self.get_mode_ui()
+        inputStr = str(self.ui.sub2_lineEdit.text())
+        projectEntity = self.ui.project_comboBox.itemData(self.ui.project_comboBox.currentIndex(), QtCore.Qt.UserRole)
+
+        if assetMode:
+            QtGui.QMessageBox.question(self, 'Warning', 'No working')
+            return
+            sg_process.add_list_field(inputStr, 'sg_subtype')
+            self.ui.ui2_listWidget.blockSignals(True)
+            self.set_subtype_ui()
+            self.ui.ui2_listWidget.blockSignals(False)
+
+        if sceneMode:
+            selEpisode = self.ui.ui1_listWidget.currentItem()
+            if selEpisode:
+                episodeEntity = selEpisode.data(QtCore.Qt.UserRole)
+                shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=episodeEntity.get('code'), entitySub2=inputStr)
+
+                result = QtGui.QMessageBox.question(self, 'Create sequence?', 'Create sequence %s?' % inputStr, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Cancel)
+
+                if result == QtGui.QMessageBox.Ok:
+                    sgResult = sg_process.create_sequence(projectEntity, episodeEntity, shot.sequenceName(project=True), inputStr)
+
+                    if sgResult:
+                        sequencePath = shot.entity2Path()
+
+                        if not os.path.exists(sequencePath):
+                            os.makedirs(sequencePath)
+
+                    self.sg_set_sequence_ui()
+                    self.ui.sub2_lineEdit.setText('')
+
 
     def create_entity(self):
         assetMode, sceneMode = self.get_mode_ui()
@@ -879,10 +954,32 @@ class SGFileManager(QtGui.QMainWindow):
                 else:
                     QtGui.QMessageBox.warning(self, 'Warning', '%s already exists in Shotgun' % entityName)
 
-        else:
-            title = 'Error'
-            message = 'Name cannot be empty. Type and Subtype cannot be "all"'
-            QtGui.QMessageBox.warning(self, title, message, QtGui.QMessageBox.Ok)
+            if sceneMode:
+                episodeEntity = self.ui.ui1_listWidget.currentItem().data(QtCore.Qt.UserRole)
+                sequenceEntity = self.ui.ui2_listWidget.currentItem().data(QtCore.Qt.UserRole)
+                shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=entitySub1, entitySub2=entitySub2, name=entityName)
+                shortCode = entityName
+                if not shortCode in [str(a.text()) for a in self.get_all_listWidget_items(self.ui.entity_listWidget)]:
+                    title = 'question'
+                    shotName = shot.shotName(project=True)
+                    message = 'Do you want to create shot %s? Sg name is %s' % (entityName, shotName)
+                    result = QtGui.QMessageBox.warning(self, title, message, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Cancel)
+
+                    if result == QtGui.QMessageBox.Ok:
+                        sgResult = sg_process.create_shot(projectEntity, episodeEntity, sequenceEntity, shotName, shortCode, template='default')
+                        if sgResult:
+                            dirResult = pipeline_utils.create_scene_template(root, project=projectEntity.get('name'), episodeName=entitySub1, sequenceName=entitySub2, shotName=entityName)
+
+                        self.set_shot_entity_ui()
+                        self.ui.entity_lineEdit.setText('')
+
+                else:
+                    QtGui.QMessageBox.warning(self, 'warning', '%s exists' % entityName, QtGui.QMessageBox.Ok)
+
+        # else:
+        #     title = 'Error'
+        #     message = 'Name cannot be empty. Type and Subtype cannot be "all"'
+        #     QtGui.QMessageBox.warning(self, title, message, QtGui.QMessageBox.Ok)
 
     # show menu
     def show_entity_menu(self, pos):
@@ -971,12 +1068,15 @@ class SGFileManager(QtGui.QMainWindow):
     def menu_command(self, section, data, menuItem):
         root = self.workspaces[str(self.ui.root_comboBox.currentText())]
         project = str(self.ui.project_comboBox.currentText())
+        mode = self.get_mode_ui(entity=True)
 
         title = str(menuItem.text()) if menuItem else ''
 
         if section == 'entity':
             entity = data
-            asset = self.asset_object(entity)
+            asset = self.entity_object(mode, entity)
+            shot = self.entity_object(mode, entity)
+
             if title == 'Open in Explorer':
                 entityPath = asset.entityPath(root=root)
                 if os.path.exists(entityPath) :
@@ -984,11 +1084,18 @@ class SGFileManager(QtGui.QMainWindow):
                     subprocess.Popen(r'explorer /select,"%s"' % entityPath)
 
             if title == 'Create Directory':
-                pipeline_utils.create_asset_template(root, asset.project, asset.type, asset.subtype, asset.name)
-                self.sgAssets = None
-                index = self.ui.entity_listWidget.currentIndex()
-                self.set_asset_entity_ui()
-                self.ui.entity_listWidget.setCurrentIndex(index)
+                if mode == self.asset:
+                    pipeline_utils.create_asset_template(root, asset.project, asset.type, asset.subtype, asset.name)
+                    self.sgAssets = None
+                    index = self.ui.entity_listWidget.currentRow()
+                    self.set_asset_entity_ui()
+                    self.ui.entity_listWidget.setCurrentRow(index)
+
+                if mode == self.scene:
+                    index = self.ui.entity_listWidget.currentRow()
+                    pipeline_utils.create_scene_template(root, shot.project, shot.episode, shot.sequence, shot.shotName(fullName=False))
+                    self.set_shot_entity_ui()
+                    self.ui.entity_listWidget.setCurrentRow(index)
 
         if section == 'task':
             category = menuItem.parentWidget().title() if menuItem else ''
@@ -1000,30 +1107,37 @@ class SGFileManager(QtGui.QMainWindow):
             self.set_task_ui()
 
         if section == 'file':
-            path = item.data(QtCore.Qt.UserRole)
+            path = data
             if title == 'Open in Explorer':
                 if os.path.exists(path) :
                     path = path.replace('/', '\\')
                     subprocess.Popen(r'explorer /select,"%s"' % path)
 
-    def asset_object(self, entity):
+    def entity_object(self, mode, entity):
         project = str(self.ui.project_comboBox.currentText())
-        mode = self.asset
-        return path_info.PathInfo(project=project, entity=mode, entitySub1=entity['sg_asset_type'], entitySub2=entity['sg_subtype'], name=entity['code'])
+        if mode == self.asset:
+            return path_info.PathInfo(project=project, entity=mode, entitySub1=entity['sg_asset_type'], entitySub2=entity['sg_subtype'], name=entity['code'])
+        if mode == self.scene:
+            return path_info.PathInfo(project=project, entity=mode, entitySub1=entity['sg_episode']['name'], entitySub2=entity['sg_sequence.Sequence.sg_shortcode'], name=entity['sg_shortcode'])
 
     # scene sections
-    def sg_set_episode_ui(self):
+    def sg_set_episode_ui(self, selItem=''):
         project = str(self.ui.project_comboBox.currentText())
         episodes = sg_process.get_episodes(project)
         self.ui.ui1_listWidget.clear()
         self.ui.ui2_listWidget.clear()
         self.ui.entity_listWidget.clear()
         self.ui.task_listWidget.clear()
+        index = 0
 
-        for episode in sorted(episodes):
+        for row, episode in enumerate(sorted(episodes)):
             item = QtGui.QListWidgetItem(self.ui.ui1_listWidget)
             item.setText(episode.get('code'))
             item.setData(QtCore.Qt.UserRole, episode)
+            if selItem == episode.get('code'):
+                index = row
+        self.ui.ui1_listWidget.setCurrentRow(index)
+
 
     def sg_set_sequence_ui(self):
         projectEntity = self.ui.project_comboBox.itemData(self.ui.project_comboBox.currentIndex(), QtCore.Qt.UserRole)
@@ -1038,6 +1152,11 @@ class SGFileManager(QtGui.QMainWindow):
             item.setText(sequence.get('sg_shortcode'))
             item.setData(QtCore.Qt.UserRole, sequence)
 
+        self.ui.ui2_listWidget.sortItems()
+
+        if projectEntity and episodeEntity:
+            shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=episodeEntity.get('code', ''))
+            self.ui.path_lineEdit.setText(path_info.convertRel(shot.entity1Path()))
 
     def set_shot_entity_ui(self):
         root = self.workspaces[str(self.ui.root_comboBox.currentText())]
@@ -1049,10 +1168,8 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.task_listWidget.clear()
 
 
-
         for shotEntity in sorted(shotEntities):
             shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=episodeEntity.get('code', ''), entitySub2=sequenceEntity.get('sg_shortcode'), name=shotEntity.get('sg_shortcode'))
-            print shot.entityPath(root=root)
             iconPath = icon.nodir
             if os.path.exists(shot.entityPath(root=root)):
                 iconPath = icon.dir
@@ -1064,6 +1181,8 @@ class SGFileManager(QtGui.QMainWindow):
             iconWidget = QtGui.QIcon()
             iconWidget.addPixmap(QtGui.QPixmap(iconPath),QtGui.QIcon.Normal,QtGui.QIcon.Off)
             item.setIcon(iconWidget)
+
+        self.ui.entity_listWidget.sortItems()
 
         self.set_path()
 
@@ -1098,3 +1217,6 @@ class SGFileManager(QtGui.QMainWindow):
 
     def get_sg_asset_task(self, step):
         sg_process.get_task(entityType, userEntity, projectEntity, episodeEntity, stepEntity)
+
+    def get_all_listWidget_items(self, widget):
+        return [widget.item(a) for a in range(widget.count())]
