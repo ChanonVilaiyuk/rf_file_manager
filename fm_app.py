@@ -26,8 +26,10 @@ from rftool.utils import sg_wrapper
 from rftool.utils import sg_process
 from rftool.utils import icon
 from rftool.utils import pipeline_utils
+from rftool.utils import maya_utils
 from startup import config
 from rftool.utils.userCheck import user_app
+from rftool.prop_it import propIt_app
 
 moduleDir = sys.modules[__name__].__file__
 
@@ -992,10 +994,41 @@ class SGFileManager(QtGui.QMainWindow):
             menu.addAction('Open in Explorer')
             menu.addAction('Create Directory')
 
+            self.reference_menu(menu)
+            self.propit_menu(menu)
+
             menu.popup(self.ui.entity_listWidget.mapToGlobal(pos))
             selMenuItem = menu.exec_(self.ui.entity_listWidget.mapToGlobal(pos))
 
             self.menu_command('entity', data, selMenuItem)
+
+    def reference_menu(self, menu):
+        currentItem = self.ui.entity_listWidget.currentItem()
+        mode = self.get_mode_ui(entity=True)
+        entity = currentItem.data(QtCore.Qt.UserRole)
+        asset = self.entity_object(mode, entity)
+        refs = asset.getRefs()
+
+        if mode == self.asset:
+            menu.addSeparator()
+            referenceMenu = QtGui.QMenu('Reference', self)
+            referenceMenu.triggered.connect(partial(self.create_reference, asset))
+
+            if refs:
+                for ref in refs:
+                    referenceMenu.addAction(ref)
+            else:
+                referenceMenu.addAction('No File')
+
+            menu.addMenu(referenceMenu)
+
+    def propit_menu(self, menu):
+        mode = self.get_mode_ui(entity=True)
+
+        if mode == self.asset:
+            menu.addSeparator()
+            menu.addAction('Prop it')
+
 
     def show_task_menu(self, pos):
         ''' context menu for download repo '''
@@ -1053,6 +1086,21 @@ class SGFileManager(QtGui.QMainWindow):
             userMenu.addMenu(groupMenu)
         menu.addMenu(userMenu)
 
+    def create_reference(self, asset, menuItem):
+        referenceFile = str(menuItem.text())
+        res = path_info.guess_res(referenceFile)
+        refDir = asset.libPath()
+        refPath = '%s/%s' % (refDir, referenceFile)
+
+        if res:
+            namespace = '%s_%s' % (asset.name, res)
+        else:
+            # invalid filename
+            namespace = asset.name
+
+        if os.path.exists(refPath):
+            maya_utils.create_reference(namespace, refPath)
+
     def set_task_status(self, taskEntity, menuItem):
         status = str(menuItem.text())
         sgStatus = sg_process.set_task_status(taskEntity['id'], status)
@@ -1063,7 +1111,6 @@ class SGFileManager(QtGui.QMainWindow):
         userId = int(name.split('[')[-1].replace(']', ''))
         result = sg_process.assign_task(taskEntity['id'], userId)
         self.set_task_ui()
-
 
     def menu_command(self, section, data, menuItem):
         root = self.workspaces[str(self.ui.root_comboBox.currentText())]
@@ -1096,6 +1143,10 @@ class SGFileManager(QtGui.QMainWindow):
                     pipeline_utils.create_scene_template(root, shot.project, shot.episode, shot.sequence, shot.shotName(fullName=False))
                     self.set_shot_entity_ui()
                     self.ui.entity_listWidget.setCurrentRow(index)
+
+            if title == 'Prop it':
+                propIt_app.show(asset, entity)
+
 
         if section == 'task':
             category = menuItem.parentWidget().title() if menuItem else ''
