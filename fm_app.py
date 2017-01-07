@@ -479,7 +479,8 @@ class SGFileManager(QtGui.QMainWindow):
             else:
                 if assetMode:
                     if not self.firstStartUI:
-                        self.set_asset_entity_ui()
+                        self.set_subtype_ui(filters=True)
+                        # self.set_asset_entity_ui()
 
                 if sceneMode:
                     self.sg_set_sequence_ui()
@@ -557,6 +558,8 @@ class SGFileManager(QtGui.QMainWindow):
     def set_type_ui(self, selectItem=''):
         if not self.sgType:
             self.sgType = sorted(sg_process.get_type())
+            self.sgType = [a for a in self.sgType if a in config.assetTypes]
+
         index = self.sgType.index(selectItem) if selectItem in self.sgType else 0
         self.ui.ui1_listWidget.clear()
         self.ui.ui1_listWidget.addItem('all')
@@ -564,14 +567,42 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.ui1_listWidget.setCurrentRow(index)
 
 
-    def set_subtype_ui(self, selectItem=''):
+    def set_subtype_ui(self, selectItem='', filters=False):
         if not self.sgSubType:
             self.sgSubType = sorted(sg_process.get_subtype())
         index = self.sgSubType.index(selectItem) if selectItem in self.sgSubType else 0
-        self.ui.ui2_listWidget.clear()
-        self.ui.ui2_listWidget.addItem('all')
-        self.ui.ui2_listWidget.addItems(self.sgSubType)
-        self.ui.ui2_listWidget.setCurrentRow(index)
+
+        if not filters:
+            self.ui.ui2_listWidget.clear()
+            self.ui.ui2_listWidget.addItem('all')
+            self.ui.ui2_listWidget.addItems(self.sgSubType)
+            self.ui.ui2_listWidget.setCurrentRow(index)
+
+        if filters:
+            selType = str(self.ui.ui1_listWidget.currentItem().text())
+            items = [self.ui.ui2_listWidget.item(i) for i in range(self.ui.ui2_listWidget.count())]
+            nestedDict = self.type_subtype_data()
+            if selType in nestedDict.keys():
+                subTypes = sorted(nestedDict[selType])
+                validSubtypes = [a for a in items if str(a.text()) in subTypes]
+
+            else:
+                validSubtypes = []
+
+                if selType == 'all':
+                    validSubtypes = items
+
+            for item in items:
+                if str(item.text()) in [str(a.text()) for a in validSubtypes]:
+                    # item.setFont(QtGui.QFont('Verdana', italic=True))
+                    item.setForeground(QtGui.QColor(255, 255, 255))
+                else:
+                    # item.setFont(QtGui.QFont('Verdana', italic=False))
+                    item.setForeground(QtGui.QColor(100, 100, 100))
+
+            self.set_asset_entity_ui()
+
+
 
     def set_episode_ui(self, selectItem=''):
         project = str(self.ui.project_comboBox.currentText())
@@ -759,6 +790,23 @@ class SGFileManager(QtGui.QMainWindow):
 
 
     # utils
+    def type_subtype_data(self):
+        nestedDict = dict()
+        if self.sgAssets:
+            for each in self.sgAssets:
+                assetType = each['sg_asset_type']
+                assetSubType = each['sg_subtype']
+                assetName = each['code']
+
+                if not assetType in nestedDict.keys():
+                    nestedDict.update({assetType: {assetSubType: [assetName]}})
+                else:
+                    if not assetSubType in nestedDict[assetType].keys():
+                        nestedDict[assetType].update({assetSubType: [assetName]})
+                    else:
+                        nestedDict[assetType][assetSubType].append(assetName)
+        return nestedDict
+
     def combine_path(self):
         mode = self.get_mode_ui(entity=True)
         project = str(self.ui.project_comboBox.currentText())
