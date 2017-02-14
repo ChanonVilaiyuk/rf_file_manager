@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout" stretch="9,1">
     <item>
-     <layout class="QGridLayout" name="gridLayout_5" columnstretch="3,0,0,0,0" rowminimumheight="0,0,0,0,0,0,0,0,0,0">
+     <layout class="QGridLayout" name="gridLayout_5" columnstretch="3,3,3,4,4" rowminimumheight="0,0,0,0,0,0,0,0,0,0">
       <item row="0" column="1">
        <widget class="QFrame" name="entity_frame">
         <layout class="QHBoxLayout" name="horizontalLayout_6">
@@ -5736,6 +5736,49 @@ QPushButton:pressed {
         <property name="text">
          <string>Show only task file</string>
         </property>
+       </widget>
+      </item>
+      <item row="4" column="3">
+       <widget class="QFrame" name="resolution_frame">
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="margin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QRadioButton" name="pr_radioButton">
+           <property name="text">
+            <string>pr</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="lo_radioButton">
+           <property name="text">
+            <string>lo</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="md_radioButton">
+           <property name="text">
+            <string>md</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="hi_radioButton">
+           <property name="text">
+            <string>hi</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>

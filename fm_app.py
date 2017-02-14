@@ -1,5 +1,6 @@
 # v.0.0.1 first version
 # v.0.0.2 correct file naming adding task
+# v.0.0.3 batch shot creation
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -66,7 +67,7 @@ class SGFileManager(QtGui.QMainWindow):
         super(SGFileManager, self).__init__(parent)
         self.ui = ui.Ui_SGFileManagerUI()
         self.ui.setupUi(self)
-        self.setWindowTitle('SGFileManager v.0.0.2 - taskname fix')
+        self.setWindowTitle('SGFileManager v.0.0.3 - batch shot creation')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -79,6 +80,7 @@ class SGFileManager(QtGui.QMainWindow):
         self.sgType = None
         self.sgSubType = None
         self.sgUser = None
+        self.allRes = ['pr', 'lo', 'md', 'hi']
 
         # start ui
         self.firstStartUI = True
@@ -141,6 +143,12 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.root_comboBox.currentIndexChanged.connect(self.root_signal)
         self.ui.work_comboBox.currentIndexChanged.connect(self.work_signal)
 
+        # radioButton
+        self.ui.pr_radioButton.clicked.connect(partial(self.res_signal, 'pr'))
+        self.ui.lo_radioButton.clicked.connect(partial(self.res_signal, 'lo'))
+        self.ui.md_radioButton.clicked.connect(partial(self.res_signal, 'md'))
+        self.ui.hi_radioButton.clicked.connect(partial(self.res_signal, 'hi'))
+
         # listWidget
         self.ui.ui1_listWidget.itemSelectionChanged.connect(self.ui1_signal)
         self.ui.ui2_listWidget.itemSelectionChanged.connect(self.ui2_signal)
@@ -158,6 +166,9 @@ class SGFileManager(QtGui.QMainWindow):
 
         # user setting
         self.ui.user_pushButton.clicked.connect(self.check_user)
+
+    def test(self, res):
+        print res
 
     def start_ui(self):
         ''' refresh ui here '''
@@ -215,6 +226,7 @@ class SGFileManager(QtGui.QMainWindow):
         self.ui.filter_checkBox.setText('Episode')
         self.ui.filter1_comboBox.setVisible(True)
         self.ui.filter_checkBox.setVisible(True)
+        self.ui.resolution_frame.setVisible(True)
 
     def set_scene_ui(self):
         # show / hide ui elements
@@ -225,6 +237,7 @@ class SGFileManager(QtGui.QMainWindow):
         # hide filter
         self.ui.filter1_comboBox.setVisible(False)
         self.ui.filter_checkBox.setVisible(False)
+        self.ui.resolution_frame.setVisible(False)
 
     def set_mytask_ui(self):
         mode = self.get_mode_ui(entity=True)
@@ -567,6 +580,10 @@ class SGFileManager(QtGui.QMainWindow):
             if sceneMode:
                 self.set_entity_sgItem()
                 self.set_task_ui()
+
+    def res_signal(self, res):
+        self.set_task_ui()
+        # self.set_work_files()
 
 
     def task_listWidget_signal(self):
@@ -936,16 +953,20 @@ class SGFileManager(QtGui.QMainWindow):
                 index = workspaces.index(rootApp) if rootApp in workspaces else 0
                 self.ui.work_comboBox.setCurrentIndex(index)
 
-    def set_task_ui(self, sel=''):
+    def set_task_ui(self, sel='', cache=False):
+        assetMode, sceneMode = self.get_mode_ui()
         selectedItem = self.ui.entity_listWidget.currentItem()
         self.ui.task_listWidget.clear()
         self.ui.file_listWidget.clear()
+        res = self.get_asset_res()
 
         if selectedItem:
             if not str(selectedItem.text()) == 'No Item':
                 entity = selectedItem.data(QtCore.Qt.UserRole)
                 if entity:
                     tasks = sg_process.get_tasks(entity)
+                    if assetMode:
+                        tasks = self.filterTask(tasks, res)
 
                     # self.ui.task_listWidget.setSortingEnabled(True)
 
@@ -1001,6 +1022,7 @@ class SGFileManager(QtGui.QMainWindow):
             stepPath = asset.stepPath(root=root, relativePath=False)
             work = str(self.ui.work_comboBox.currentText())
             path = '%s/%s' % (stepPath, work)
+            filterRes = '%s_%s' % (asset.step, self.get_asset_res())
 
             saveFilename = ''
 
@@ -1009,7 +1031,7 @@ class SGFileManager(QtGui.QMainWindow):
             if os.path.exists(path):
                 files = file_utils.listFile(path)
                 if self.ui.taskFilter_checkBox.isChecked():
-                    files = [a for a in files if asset.task in a]
+                    files = [a for a in files if filterRes in a]
 
                 for eachFile in files:
                     item = QtGui.QListWidgetItem(self.ui.file_listWidget)
@@ -1099,20 +1121,29 @@ class SGFileManager(QtGui.QMainWindow):
     def get_save_filename(self, project, mode, path, asset):
         ''' define naming convention for file name '''
         projectCode = project.get('sg_project_code', '')
-        version = file_utils.find_next_version(file_utils.listFile(path))
+        allFiles = file_utils.listFile(path)
+
         nameElems = []
         # if projectCode:
             # nameElems.append(projectCode)
         if mode == self.asset:
+            taskEntity = self.ui.task_listWidget.currentItem()
+            taskName = taskEntity.data(QtCore.Qt.UserRole).get('content')
+            filterRes = '%s_%s' % (asset.step, self.get_asset_res())
+            allFiles = [a for a in allFiles if filterRes in a]
+
             # add step name
             # nameElems.append(asset.assetName(step=True))
             # add task name
-            nameElems.append(asset.assetName())
-            nameElems.append(asset.task)
+            nameElems.append(asset.assetName(step=True))
+            if any(a for a in self.allRes if a in taskName):
+                nameElems.append(self.get_asset_res())
         if mode == self.scene:
             if projectCode:
                 nameElems.append(projectCode)
                 nameElems.append(asset.shotName(step=True))
+
+        version = file_utils.find_next_version(allFiles)
         nameElems.append(version)
         nameElems.append(mc.optionVar(q=config.localUser))
         filename = '%s.ma' % ('_').join(nameElems)
@@ -1173,12 +1204,19 @@ class SGFileManager(QtGui.QMainWindow):
         workspace = str(self.ui.work_comboBox.currentText())
         filename = str(self.ui.fileName_lineEdit.text())
         saveFile = '%s/%s/%s' % (absPath, workspace, filename)
+        save = True
+        if os.path.exists(saveFile):
+            save = False
+            saveDecision = QtGui.QMessageBox.question(self, 'Confirm', '%s exists. Do you want to overwrite?' % saveFile, QtGui.QMessageBox.Yes, QtGui.QMessageBox.Cancel)
+            if saveDecision == QtGui.QMessageBox.Yes:
+                save = True
 
-        mc.file(rename=saveFile)
-        result = mc.file(save=True, type='mayaAscii')
-        self.set_work_files()
+        if save:
+            mc.file(rename=saveFile)
+            result = mc.file(save=True, type='mayaAscii')
+            self.set_work_files()
 
-        return result
+            return result
 
     def add_entity1(self):
         ''' create type for asset, create episode for scene '''
@@ -1451,47 +1489,50 @@ class SGFileManager(QtGui.QMainWindow):
 
                     if result:
                         print 'dialog OK'
-                        # dir code
-                        shortCode = str(dialog.ui.lineEdit1_lineEdit.text())
-                        shotName = str(dialog.ui.lineEdit2_lineEdit.text())
+                        data = dialog.data
 
-                        # range
-                        # startFrame = int(str(dialog.ui.start_lineEdit.text()))
-                        # endFrame = int(str(dialog.ui.end_lineEdit.text()))
-                        # duration = int(endFrame) - int(startFrame) + 1
+                        for shortCode, shotName in sorted(data.iteritems()):
+                            # dir code
+                            # shortCode = str(dialog.ui.lineEdit1_lineEdit.text())
+                            # shotName = str(dialog.ui.lineEdit2_lineEdit.text())
 
-                        # shot entity
-                        shot = self.get_project_root(level=2, obj=True)
-                        sequenceName = shot.sequenceName(project=True)
+                            # range
+                            # startFrame = int(str(dialog.ui.start_lineEdit.text()))
+                            # endFrame = int(str(dialog.ui.end_lineEdit.text()))
+                            # duration = int(endFrame) - int(startFrame) + 1
 
-                        episodeEntity = entitySub1.data(QtCore.Qt.UserRole)
-                        if not episodeEntity:
-                            episodeEntity = sg_process.get_one_episode(projectEntity.get('name'), str(entitySub1.text()))
-                            entitySub1.setData(QtCore.Qt.UserRole, episodeEntity)
+                            # shot entity
+                            shot = self.get_project_root(level=2, obj=True)
+                            sequenceName = shot.sequenceName(project=True)
 
-                        sequenceEntity = entitySub2.data(QtCore.Qt.UserRole)
-                        print episodeEntity
-                        print sequenceName
-                        if not sequenceEntity:
-                            sequenceEntity = sg_process.get_one_sequence(projectEntity.get('name'), episodeEntity.get('code'), sequenceName)
-                            entitySub2.setData(QtCore.Qt.UserRole, sequenceEntity)
+                            episodeEntity = entitySub1.data(QtCore.Qt.UserRole)
+                            if not episodeEntity:
+                                episodeEntity = sg_process.get_one_episode(projectEntity.get('name'), str(entitySub1.text()))
+                                entitySub1.setData(QtCore.Qt.UserRole, episodeEntity)
 
-                        print sequenceEntity
+                            sequenceEntity = entitySub2.data(QtCore.Qt.UserRole)
+                            print episodeEntity
+                            print sequenceName
+                            if not sequenceEntity:
+                                sequenceEntity = sg_process.get_one_sequence(projectEntity.get('name'), episodeEntity.get('code'), sequenceName)
+                                entitySub2.setData(QtCore.Qt.UserRole, sequenceEntity)
 
-                        if episodeEntity and sequenceEntity:
-                            sgResult = sg_process.create_shot(projectEntity, episodeEntity, sequenceEntity, shotName, shortCode, template='default')
-                            if sgResult:
-                                shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=entityItem1, entitySub2=entityItem2, name=shortCode)
-                                shotPath = shot.entityPath()
+                            print sequenceEntity
 
-                                if not os.path.exists(shotPath):
-                                    dirResult = pipeline_utils.create_scene_template(root, project=projectEntity.get('name'), episodeName=entityItem1, sequenceName=entityItem2, shotName=shortCode)
+                            if episodeEntity and sequenceEntity:
+                                sgResult = sg_process.create_shot(projectEntity, episodeEntity, sequenceEntity, shotName, shortCode, template='default')
+                                if sgResult:
+                                    shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=entityItem1, entitySub2=entityItem2, name=shortCode)
+                                    shotPath = shot.entityPath()
 
-                                self.set_entity_svui()
-                                self.ui.entity_lineEdit.setText('')
+                                    if not os.path.exists(shotPath):
+                                        dirResult = pipeline_utils.create_scene_template(root, project=projectEntity.get('name'), episodeName=entityItem1, sequenceName=entityItem2, shotName=shortCode)
 
-                        else:
-                            QtGui.QMessageBox.warning(self, 'Warning', 'Episode or Sequence are not in Shotgun')
+                                    self.set_entity_svui()
+                                    self.ui.entity_lineEdit.setText('')
+
+                            else:
+                                QtGui.QMessageBox.warning(self, 'Warning', 'Episode or Sequence are not in Shotgun')
 
 
     # else:
@@ -1903,6 +1944,26 @@ class SGFileManager(QtGui.QMainWindow):
                         asset.task = taskName
                         return asset
 
+    def get_asset_res(self):
+        if self.ui.pr_radioButton.isChecked():
+            return 'pr'
+        if self.ui.lo_radioButton.isChecked():
+            return 'lo'
+        if self.ui.md_radioButton.isChecked():
+            return 'md'
+        if self.ui.hi_radioButton.isChecked():
+            return 'hi'
+
+    def filterTask(self, tasks, res):
+        newTasks = []
+        for task in tasks:
+            if res in task.get('content'):
+                newTasks.append(task)
+            else:
+                if not any(a for a in self.allRes if a in task.get('content')):
+                    newTasks.append(task)
+
+        return newTasks
 
     # my task sections
     def set_mytask_step(self):

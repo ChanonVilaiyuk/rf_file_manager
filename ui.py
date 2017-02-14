@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'C:/Users/TA/Dropbox/script_server/core/maya/rftool/file_manager/ui.ui'
 #
-# Created: Sun Feb 12 19:51:51 2017
+# Created: Mon Feb 13 11:03:51 2017
 #      by: pyside-uic 0.2.14 running on PySide 1.2.0
 #
 # WARNING! All changes made in this file will be lost!
@@ -2074,7 +2074,31 @@ class Ui_SGFileManagerUI(object):
         self.taskFilter_checkBox = QtGui.QCheckBox(self.centralwidget)
         self.taskFilter_checkBox.setObjectName("taskFilter_checkBox")
         self.gridLayout_5.addWidget(self.taskFilter_checkBox, 8, 4, 1, 1)
+        self.resolution_frame = QtGui.QFrame(self.centralwidget)
+        self.resolution_frame.setObjectName("resolution_frame")
+        self.horizontalLayout_2 = QtGui.QHBoxLayout(self.resolution_frame)
+        self.horizontalLayout_2.setSpacing(0)
+        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.pr_radioButton = QtGui.QRadioButton(self.resolution_frame)
+        self.pr_radioButton.setObjectName("pr_radioButton")
+        self.horizontalLayout_2.addWidget(self.pr_radioButton)
+        self.lo_radioButton = QtGui.QRadioButton(self.resolution_frame)
+        self.lo_radioButton.setObjectName("lo_radioButton")
+        self.horizontalLayout_2.addWidget(self.lo_radioButton)
+        self.md_radioButton = QtGui.QRadioButton(self.resolution_frame)
+        self.md_radioButton.setChecked(True)
+        self.md_radioButton.setObjectName("md_radioButton")
+        self.horizontalLayout_2.addWidget(self.md_radioButton)
+        self.hi_radioButton = QtGui.QRadioButton(self.resolution_frame)
+        self.hi_radioButton.setObjectName("hi_radioButton")
+        self.horizontalLayout_2.addWidget(self.hi_radioButton)
+        self.gridLayout_5.addWidget(self.resolution_frame, 4, 3, 1, 1)
         self.gridLayout_5.setColumnStretch(0, 3)
+        self.gridLayout_5.setColumnStretch(1, 3)
+        self.gridLayout_5.setColumnStretch(2, 3)
+        self.gridLayout_5.setColumnStretch(3, 4)
+        self.gridLayout_5.setColumnStretch(4, 4)
         self.verticalLayout.addLayout(self.gridLayout_5)
         spacerItem3 = QtGui.QSpacerItem(20, 465, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
         self.verticalLayout.addItem(spacerItem3)
@@ -2125,6 +2149,10 @@ class Ui_SGFileManagerUI(object):
         self.open_pushButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "Open", None, QtGui.QApplication.UnicodeUTF8))
         self.save_pushButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "Save ++", None, QtGui.QApplication.UnicodeUTF8))
         self.taskFilter_checkBox.setText(QtGui.QApplication.translate("SGFileManagerUI", "Show only task file", None, QtGui.QApplication.UnicodeUTF8))
+        self.pr_radioButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "pr", None, QtGui.QApplication.UnicodeUTF8))
+        self.lo_radioButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "lo", None, QtGui.QApplication.UnicodeUTF8))
+        self.md_radioButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "md", None, QtGui.QApplication.UnicodeUTF8))
+        self.hi_radioButton.setText(QtGui.QApplication.translate("SGFileManagerUI", "hi", None, QtGui.QApplication.UnicodeUTF8))
         self.menuPreferences.setTitle(QtGui.QApplication.translate("SGFileManagerUI", "Preferences", None, QtGui.QApplication.UnicodeUTF8))
         self.actionSuper_User_Mode.setText(QtGui.QApplication.translate("SGFileManagerUI", "Super User Mode", None, QtGui.QApplication.UnicodeUTF8))
 
