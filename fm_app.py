@@ -1,6 +1,8 @@
 # v.0.0.1 first version
 # v.0.0.2 correct file naming adding task
 # v.0.0.3 batch shot creation
+# v.0.0.4 episode creation fix
+# v.0.0.5 batch sequence creation
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -67,7 +69,7 @@ class SGFileManager(QtGui.QMainWindow):
         super(SGFileManager, self).__init__(parent)
         self.ui = ui.Ui_SGFileManagerUI()
         self.ui.setupUi(self)
-        self.setWindowTitle('SGFileManager v.0.0.3 - batch shot creation')
+        self.setWindowTitle('SGFileManager v.0.0.5 - batch sequence creation')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -1286,8 +1288,9 @@ class SGFileManager(QtGui.QMainWindow):
                     sgResult = sg_process.create_episode(projectEntity, episodeCode)
 
                     if sgResult:
-                        shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=inputStr)
+                        shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=episodeCode)
                         episodePath = shot.entity1Path()
+                        print 'episodePath', episodePath
 
                         if not os.path.exists(episodePath):
                             os.makedirs(episodePath)
@@ -1363,27 +1366,29 @@ class SGFileManager(QtGui.QMainWindow):
                     result = dialog.exec_()
 
                     if result:
-                        shortCode = str(dialog.ui.lineEdit1_lineEdit.text())
-                        sequenceCode = str(dialog.ui.lineEdit2_lineEdit.text())
+                        data = dialog.data
+                        for shortCode, sequenceCode in sorted(data.iteritems()):
+                            # shortCode = str(dialog.ui.lineEdit1_lineEdit.text())
+                            # sequenceCode = str(dialog.ui.lineEdit2_lineEdit.text())
 
-                        episodeEntity = selEpisode.data(QtCore.Qt.UserRole)
-                        if not episodeEntity:
-                            episodeEntity = sg_process.get_one_episode(projectEntity.get('name'), str(selEpisode.text()))
-                            selEpisode.setData(QtCore.Qt.UserRole, episodeEntity)
+                            episodeEntity = selEpisode.data(QtCore.Qt.UserRole)
+                            if not episodeEntity:
+                                episodeEntity = sg_process.get_one_episode(projectEntity.get('name'), str(selEpisode.text()))
+                                selEpisode.setData(QtCore.Qt.UserRole, episodeEntity)
 
-                        if episodeEntity:
-                            sgResult = sg_process.create_sequence(projectEntity, episodeEntity, sequenceCode, shortCode)
-                            # sgResult = True
+                            if episodeEntity:
+                                sgResult = sg_process.create_sequence(projectEntity, episodeEntity, sequenceCode, shortCode)
+                                # sgResult = True
 
-                            if sgResult:
-                                shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=str(selEpisode.text()), entitySub2=shortCode)
-                                sequencePath = shot.entity2Path()
+                                if sgResult:
+                                    shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=str(selEpisode.text()), entitySub2=shortCode)
+                                    sequencePath = shot.entity2Path()
 
-                                if not os.path.exists(sequencePath):
-                                    os.makedirs(sequencePath)
+                                    if not os.path.exists(sequencePath):
+                                        os.makedirs(sequencePath)
 
-                                self.set_sequence_svui()
-                                self.ui.sub2_lineEdit.setText('')
+                                    self.set_sequence_svui()
+                                    self.ui.sub2_lineEdit.setText('')
 
 
     def create_entity(self):

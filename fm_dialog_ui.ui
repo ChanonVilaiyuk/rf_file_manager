@@ -76,7 +76,7 @@
    <item>
     <widget class="QCheckBox" name="preset_checkBox">
      <property name="text">
-      <string>Preset </string>
+      <string>Batch Preset </string>
      </property>
     </widget>
    </item>

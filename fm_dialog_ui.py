@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'C:/Users/TA/Dropbox/script_server/core/maya/rftool/file_manager/fm_dialog_ui.ui'
 #
-# Created: Tue Feb 14 23:48:25 2017
+# Created: Wed Feb 15 09:59:47 2017
 #      by: pyside-uic 0.2.14 running on PySide 1.2.0
 #
 # WARNING! All changes made in this file will be lost!
@@ -104,7 +104,7 @@ class Ui_Dialog(object):
         self.label2_label.setText(QtGui.QApplication.translate("Dialog", "TextLabel", None, QtGui.QApplication.UnicodeUTF8))
         self.label4_label.setText(QtGui.QApplication.translate("Dialog", "template : ", None, QtGui.QApplication.UnicodeUTF8))
         self.label3_label.setText(QtGui.QApplication.translate("Dialog", "TextLabel", None, QtGui.QApplication.UnicodeUTF8))
-        self.preset_checkBox.setText(QtGui.QApplication.translate("Dialog", "Preset ", None, QtGui.QApplication.UnicodeUTF8))
+        self.preset_checkBox.setText(QtGui.QApplication.translate("Dialog", "Batch Preset ", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("Dialog", "S: ", None, QtGui.QApplication.UnicodeUTF8))
         self.start_lineEdit.setText(QtGui.QApplication.translate("Dialog", "10", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("Dialog", "-", None, QtGui.QApplication.UnicodeUTF8))
