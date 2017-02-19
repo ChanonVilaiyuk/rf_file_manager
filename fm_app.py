@@ -3,6 +3,7 @@
 # v.0.0.3 batch shot creation
 # v.0.0.4 episode creation fix
 # v.0.0.5 batch sequence creation
+# v.0.0.6 asset match open scene selection
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -69,7 +70,7 @@ class SGFileManager(QtGui.QMainWindow):
         super(SGFileManager, self).__init__(parent)
         self.ui = ui.Ui_SGFileManagerUI()
         self.ui.setupUi(self)
-        self.setWindowTitle('SGFileManager v.0.0.5 - batch sequence creation')
+        self.setWindowTitle('SGFileManager v.0.0.6 - asset match open scene selection')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -169,8 +170,6 @@ class SGFileManager(QtGui.QMainWindow):
         # user setting
         self.ui.user_pushButton.clicked.connect(self.check_user)
 
-    def test(self, res):
-        print res
 
     def start_ui(self):
         ''' refresh ui here '''
@@ -656,7 +655,7 @@ class SGFileManager(QtGui.QMainWindow):
 
 
     # server ===========================================
-    def set_type_svui(self, selectItem=''):
+    def set_type_svui(self):
         self.ui.ui1_listWidget.clear()
         self.ui.ui2_listWidget.clear()
         self.ui.entity_listWidget.clear()
@@ -679,12 +678,16 @@ class SGFileManager(QtGui.QMainWindow):
             item.setIcon(iconWidget)
             item.setData(QtCore.Qt.UserRole, {'path': path})
 
-        if selectItem in types:
-            index = types.index(selectItem)
+        # set current selection
+        asset = path_info.PathInfo()
+        if asset.type in types:
+            index = types.index(asset.type)
             self.ui.ui1_listWidget.setCurrentRow(index)
 
 
-    def set_subtype_svui(self, selectItem=''):
+
+
+    def set_subtype_svui(self):
         self.ui.ui2_listWidget.clear()
         self.ui.entity_listWidget.clear()
         self.ui.task_listWidget.clear()
@@ -708,12 +711,14 @@ class SGFileManager(QtGui.QMainWindow):
                 item.setIcon(iconWidget)
                 item.setData(QtCore.Qt.UserRole, {'path': path})
 
-            if selectItem in subDirs2:
-                index = subDirs2.index(selectItem)
+            # set current selection
+            asset = path_info.PathInfo()
+            if asset.subtype in subDirs2:
+                index = subDirs2.index(asset.subtype)
                 self.ui.ui2_listWidget.setCurrentRow(index)
 
 
-    def set_entity_svui(self, selectItem=''):
+    def set_entity_svui(self):
         self.ui.entity_listWidget.clear()
         self.ui.task_listWidget.clear()
         self.ui.work_comboBox.clear()
@@ -733,9 +738,24 @@ class SGFileManager(QtGui.QMainWindow):
 
                 item.setIcon(iconWidget)
 
-            if selectItem in entityDirs:
-                index = entityDirs.index(selectItem)
+            # set current selection
+            asset = path_info.PathInfo()
+            if asset.name in entityDirs:
+                self.set_res_svui(asset.taskName)
+                index = entityDirs.index(asset.name)
                 self.ui.entity_listWidget.setCurrentRow(index)
+                # set task res
+
+    def set_res_svui(self, taskName):
+        if 'pr' in taskName:
+            self.ui.pr_radioButton.setChecked(True)
+        if 'lo' in taskName:
+            self.ui.lo_radioButton.setChecked(True)
+        if 'md' in taskName:
+            self.ui.md_radioButton.setChecked(True)
+        if 'hi' in taskName:
+            self.ui.hi_radioButton.setChecked(True)
+
 
     def set_step_svui(self, selectItem=''):
         self.ui.task_listWidget.clear()
@@ -973,7 +993,11 @@ class SGFileManager(QtGui.QMainWindow):
                     # self.ui.task_listWidget.setSortingEnabled(True)
 
                     if tasks:
-                        for task in sorted(tasks):
+                        currentRow = 0
+                        # set current selection
+                        pathInfo = path_info.PathInfo()
+
+                        for row, task in enumerate(sorted(tasks)):
                             taskIcon = config.sgIconMap.get(task['sg_status_list'])
                             assignees = [a.get('name') for a in task['task_assignees']]
                             assigneesStr = (',').join(assignees)
@@ -991,11 +1015,15 @@ class SGFileManager(QtGui.QMainWindow):
                             # item.setText('%s - %s' % (task['content'], task['task_assignees']))
                             item.setData(QtCore.Qt.UserRole, task)
 
+                            if task['content'] == pathInfo.taskName:
+                                currentRow = row
+
                             # iconWidget = QtGui.QIcon()
                             # iconWidget.addPixmap(QtGui.QPixmap(taskIcon),QtGui.QIcon.Normal,QtGui.QIcon.Off)
                             # item.setIcon(iconWidget)
 
                         # self.ui.task_listWidget.sortItems()
+                        self.ui.task_listWidget.setCurrentRow(currentRow)
 
                     else:
                         self.ui.task_listWidget.addItem('No tasks in Shotgun')
@@ -1948,6 +1976,7 @@ class SGFileManager(QtGui.QMainWindow):
                         asset = path_info.PathInfo(self.get_project_root(level=5))
                         asset.task = taskName
                         return asset
+
 
     def get_asset_res(self):
         if self.ui.pr_radioButton.isChecked():

@@ -57,6 +57,7 @@ class entityDialog(QtGui.QDialog):
 			self.ui.label2_label.setText('SG name')
 			self.ui.lineEdit1_lineEdit.setText(self.sequence)
 			self.ui.preset_checkBox.setVisible(True)
+			self.ui.button3_pushButton.setEnabled(False)
 
 		if self.mode == 'shot':
 			self.ui.label1_label.setText('Dir/Short code')
@@ -64,6 +65,7 @@ class entityDialog(QtGui.QDialog):
 			self.ui.lineEdit1_lineEdit.setText(self.shot)
 			self.ui.button3_pushButton.setText('Batch Create')
 			self.ui.preset_checkBox.setVisible(True)
+			self.ui.button3_pushButton.setEnabled(False)
 			# self.ui.start_lineEdit.setText(str(int(mc.playbackOptions(q=True, min=True))))
 			# self.ui.end_lineEdit.setText(str(int(mc.playbackOptions(q=True, max=True))))
 
@@ -99,6 +101,11 @@ class entityDialog(QtGui.QDialog):
 		self.ui.button3_pushButton.setVisible(self.ui.preset_checkBox.isChecked())
 		self.ui.button1_pushButton.setVisible(not self.ui.preset_checkBox.isChecked())
 
+		if self.mode == 'sequence':
+			self.ui.instruction_label.setText('Create %s %s(s) q0010 - q0020' % (len(self.entities), self.mode))
+		if self.mode == 'shot':
+			self.ui.instruction_label.setText('Create %s %s(s) s0010 - s0020' % (len(self.entities), self.mode))
+
 		if not self.ui.preset_checkBox.isChecked():
 			self.resize(300, 100)
 
@@ -125,6 +132,7 @@ class entityDialog(QtGui.QDialog):
 		end = self.ui.end_lineEdit.text()
 		step = self.ui.step_lineEdit.text()
 		self.entities = []
+		self.ui.button3_pushButton.setEnabled(True)
 
 		if start.isdigit() and end.isdigit() and step.isdigit():
 			startStr = '%04d' % int(start)
