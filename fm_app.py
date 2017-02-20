@@ -4,6 +4,7 @@
 # v.0.0.4 episode creation fix
 # v.0.0.5 batch sequence creation
 # v.0.0.6 asset match open scene selection
+# v.0.0.7 asset / shot match open scene selection
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -70,7 +71,7 @@ class SGFileManager(QtGui.QMainWindow):
         super(SGFileManager, self).__init__(parent)
         self.ui = ui.Ui_SGFileManagerUI()
         self.ui.setupUi(self)
-        self.setWindowTitle('SGFileManager v.0.0.6 - asset match open scene selection')
+        self.setWindowTitle('SGFileManager v.0.0.7 - asset / shot match open scene selection')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -741,12 +742,12 @@ class SGFileManager(QtGui.QMainWindow):
             # set current selection
             asset = path_info.PathInfo()
             if asset.name in entityDirs:
-                self.set_res_svui(asset.taskName)
+                self.set_res_ui(asset.taskName)
                 index = entityDirs.index(asset.name)
                 self.ui.entity_listWidget.setCurrentRow(index)
                 # set task res
 
-    def set_res_svui(self, taskName):
+    def set_res_ui(self, taskName):
         if 'pr' in taskName:
             self.ui.pr_radioButton.setChecked(True)
         if 'lo' in taskName:
@@ -861,7 +862,7 @@ class SGFileManager(QtGui.QMainWindow):
 
 
 
-    def set_episode_sgui(self, selectItem=''):
+    def set_episode_sgui(self):
         project = str(self.ui.project_comboBox.currentText())
         sgEpisodes = sg_process.get_episodes(project)
         episodes = sorted([a['code'] for a in sgEpisodes])
@@ -931,8 +932,10 @@ class SGFileManager(QtGui.QMainWindow):
             # convert data to asset
             assetLists = sorted([sgAssetDict[a]['code'] for a in filterAssets])
             self.ui.entity_listWidget.clear()
+            sceneAsset = path_info.PathInfo()
 
-            for entityId in filterAssets:
+            currentRow = 0
+            for row, entityId in enumerate(filterAssets):
                 item = QtGui.QListWidgetItem(self.ui.entity_listWidget)
                 item.setText(sgAssetDict[entityId]['code'])
                 item.setData(QtCore.Qt.UserRole, sgAssetDict[entityId])
@@ -949,7 +952,16 @@ class SGFileManager(QtGui.QMainWindow):
 
             index = assetLists.index(selectItem) if selectItem in assetLists else 0
             self.ui.entity_listWidget.sortItems()
+            self.set_res_ui(sceneAsset.taskName)
+            self.ui.entity_listWidget.setCurrentRow(currentRow)
             # self.ui.entity_listWidget.setCurrentRow(index)
+
+            # set current active
+            asset = path_info.PathInfo()
+            index = [a for a in range(self.ui.entity_listWidget.count()) if str(self.ui.entity_listWidget.item(a).text()) == asset.name]
+            if index:
+                self.ui.entity_listWidget.setCurrentRow(index[0])
+
 
             self.set_path()
 
@@ -1031,7 +1043,8 @@ class SGFileManager(QtGui.QMainWindow):
                 else:
                     self.ui.task_listWidget.addItem('No asset in Shotgun')
 
-        self.ui.save_pushButton.setEnabled(False)
+        else:
+            self.ui.save_pushButton.setEnabled(False)
 
     def set_asset_step(self):
         selectedItem = self.ui.task_listWidget.currentItem()
@@ -1763,7 +1776,7 @@ class SGFileManager(QtGui.QMainWindow):
             return path_info.PathInfo(project=project, entity=mode, entitySub1=entity['sg_episode']['name'], entitySub2=entity['sg_sequence.Sequence.sg_shortcode'], name=entity['sg_shortcode'])
 
     # server mode
-    def set_sceneEpisode_svui(self, selItem=''):
+    def set_sceneEpisode_svui(self):
         projectRoot = self.get_project_root(level=0)
         episodes = file_utils.listFolder(projectRoot)
 
@@ -1783,11 +1796,12 @@ class SGFileManager(QtGui.QMainWindow):
                 iconWidget.addPixmap(QtGui.QPixmap(icon.dir),QtGui.QIcon.Normal,QtGui.QIcon.Off)
                 item.setIcon(iconWidget)
 
-        if selItem in episodes:
-            self.ui.ui1_listWidget.setCurrentRow(episodes.index(selItem))
+        shot = path_info.PathInfo()
+        if shot.episode in episodes:
+            self.ui.ui1_listWidget.setCurrentRow(episodes.index(shot.episode))
 
 
-    def set_sequence_svui(self, selItem=''):
+    def set_sequence_svui(self):
         projectRoot = self.get_project_root(level=1)
         sequences = file_utils.listFolder(projectRoot)
 
@@ -1806,10 +1820,11 @@ class SGFileManager(QtGui.QMainWindow):
                 iconWidget.addPixmap(QtGui.QPixmap(icon.dir),QtGui.QIcon.Normal,QtGui.QIcon.Off)
                 item.setIcon(iconWidget)
 
-        if selItem in sequences:
-            self.ui.ui2_listWidget.setCurrentRow(sequences.index(selItem))
+        shot = path_info.PathInfo()
+        if shot.sequence in sequences:
+            self.ui.ui2_listWidget.setCurrentRow(sequences.index(shot.sequence))
 
-    def set_shot_svui(self, selItem=''):
+    def set_shot_svui(self):
         projectRoot = self.get_project_root(level=2)
         shots = file_utils.listFolder(projectRoot)
 
@@ -1827,25 +1842,27 @@ class SGFileManager(QtGui.QMainWindow):
                 iconWidget.addPixmap(QtGui.QPixmap(icon.dir),QtGui.QIcon.Normal,QtGui.QIcon.Off)
                 item.setIcon(iconWidget)
 
-        if selItem in shots:
-            self.ui.entity_listWidget.setCurrentRow(shots.index(selItem))
+        shot = path_info.PathInfo()
+        if shot.name in shots:
+            self.ui.entity_listWidget.setCurrentRow(shots.index(shot.name))
 
 
     # scene sections
-    def set_sceneEpisode_sgui(self, selItem=''):
+    def set_sceneEpisode_sgui(self):
         project = str(self.ui.project_comboBox.currentText())
         episodes = sg_process.get_episodes(project)
         self.ui.ui1_listWidget.clear()
         self.ui.ui2_listWidget.clear()
         self.ui.entity_listWidget.clear()
         self.ui.task_listWidget.clear()
+        shot = path_info.PathInfo()
         index = 0
 
         for row, episode in enumerate(sorted(episodes)):
             item = QtGui.QListWidgetItem(self.ui.ui1_listWidget)
             item.setText(episode.get('code'))
             item.setData(QtCore.Qt.UserRole, episode)
-            if selItem == episode.get('code'):
+            if shot.episode == episode.get('code'):
                 index = row
         self.ui.ui1_listWidget.setCurrentRow(index)
 
@@ -1864,6 +1881,11 @@ class SGFileManager(QtGui.QMainWindow):
             item.setData(QtCore.Qt.UserRole, sequence)
 
         self.ui.ui2_listWidget.sortItems()
+
+        shot = path_info.PathInfo()
+        index = [a for a in range(self.ui.ui2_listWidget.count()) if str(self.ui.ui2_listWidget.item(a).text()) == shot.sequence]
+        if index:
+            self.ui.ui2_listWidget.setCurrentRow(index[0])
 
         if projectEntity and episodeEntity:
             shot = path_info.PathInfo(project=projectEntity.get('name'), entity=self.scene, entitySub1=episodeEntity.get('code', ''))
@@ -1894,6 +1916,11 @@ class SGFileManager(QtGui.QMainWindow):
             item.setIcon(iconWidget)
 
         self.ui.entity_listWidget.sortItems()
+
+        shot = path_info.PathInfo()
+        index = [a for a in range(self.ui.entity_listWidget.count()) if str(self.ui.entity_listWidget.item(a).text()) == shot.name]
+        if index:
+            self.ui.entity_listWidget.setCurrentRow(index[0])
 
         self.set_path()
 
