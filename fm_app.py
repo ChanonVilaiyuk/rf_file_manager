@@ -5,6 +5,7 @@
 # v.0.0.5 batch sequence creation
 # v.0.0.6 asset match open scene selection
 # v.0.0.7 asset / shot match open scene selection
+# v.0.0.8 support reference assembly
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -31,14 +32,14 @@ import fm_dialog
 import task_widget
 from rftool.utils import file_utils
 from rftool.utils import path_info
-from rftool.utils import sg_wrapper
-from rftool.utils import sg_process
 from rftool.utils import icon
 from rftool.utils import pipeline_utils
 from rftool.utils import maya_utils
 from startup import config
 from rftool.utils.userCheck import user_app
 from rftool.prop_it import propIt_app
+from rftool.utils import sg_process
+from rftool.utils import sg_wrapper
 
 moduleDir = sys.modules[__name__].__file__
 
@@ -71,7 +72,7 @@ class SGFileManager(QtGui.QMainWindow):
         super(SGFileManager, self).__init__(parent)
         self.ui = ui.Ui_SGFileManagerUI()
         self.ui.setupUi(self)
-        self.setWindowTitle('SGFileManager v.0.0.7 - asset / shot match open scene selection')
+        self.setWindowTitle('SGFileManager v.0.0.8 support reference assembly')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -619,6 +620,7 @@ class SGFileManager(QtGui.QMainWindow):
     def start_browsing(self):
         ''' start the process of list data on this functions'''
         print 'start_browsing'
+        self.set_user_ui()
         serverMode, sgMode = self.get_server_sg_ui()
         assetMode, sceneMode = self.get_mode_ui()
         myTaskMode = self.ui.user_checkBox.isChecked()
@@ -1694,6 +1696,10 @@ class SGFileManager(QtGui.QMainWindow):
         res = path_info.guess_res(referenceFile)
         refDir = asset.libPath()
         refPath = '%s/%s' % (refDir, referenceFile)
+        asm = False
+
+        if '_%s' % config.asmSuffix in referenceFile:
+            asm = True
 
         if res:
             namespace = '%s_%s' % (asset.name, res)
@@ -1702,7 +1708,13 @@ class SGFileManager(QtGui.QMainWindow):
             namespace = asset.name
 
         if os.path.exists(refPath):
-            maya_utils.create_reference(namespace, refPath)
+            if not asm:
+                maya_utils.create_reference(namespace, refPath)
+                logger.info('Create Reference namespace: %s, %s' % (namespace, refPath))
+
+            if asm:
+                maya_utils.create_asm_reference(namespace, refPath)
+                logger.info('Create Assembly Reference namespace: %s, %s' % (namespace, refPath))
 
     def set_task_status(self, taskEntity, menuItem):
         status = str(menuItem.text())
