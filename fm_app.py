@@ -1333,7 +1333,7 @@ class SGFileManager(QtWidgets.QMainWindow):
 
             if sceneMode:
                 dialog = fm_dialog.entityDialog(mode='episode', episode=str(self.ui.sub1_lineEdit.text()), parent=self)
-                result = dialog.exec_()
+                result = dialog.ui.exec_()
 
                 if result:
                     episodeCode = str(dialog.ui.lineEdit1_lineEdit.text())
@@ -1417,7 +1417,7 @@ class SGFileManager(QtWidgets.QMainWindow):
                 selEpisode = self.ui.ui1_listWidget.currentItem()
                 if selEpisode:
                     dialog = fm_dialog.entityDialog(mode='sequence', project=projectEntity, episode=str(selEpisode.text()), sequence=str(self.ui.sub2_lineEdit.text()), parent=self)
-                    result = dialog.exec_()
+                    result = dialog.ui.exec_()
 
                     if result:
                         data = dialog.data
@@ -1475,7 +1475,7 @@ class SGFileManager(QtWidgets.QMainWindow):
                         # message = 'Create asset "%s" under type %s, subtype %s?' % (entityName, entitySub1, entitySub2)
                         # result = QtWidgets.QMessageBox.question(self, title, message, QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
                         dialog = fm_dialog.entityDialog(mode='asset', asset=entityName, parent=self)
-                        result = dialog.exec_()
+                        result = dialog.ui.exec_()
 
                         if result:
                             entityName = str(dialog.ui.lineEdit1_lineEdit.text())
@@ -1528,7 +1528,7 @@ class SGFileManager(QtWidgets.QMainWindow):
                         # message = 'Create asset "%s" under type %s, subtype %s?' % (entityName, entityItem1, entityItem2)
                         # result = QtWidgets.QMessageBox.question(self, title, message, QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
                         dialog = fm_dialog.entityDialog(mode='asset', asset=entityName, parent=self)
-                        result = dialog.exec_()
+                        result = dialog.ui.exec_()
 
                         if result:
                             entityName = str(dialog.ui.lineEdit1_lineEdit.text())
@@ -1544,7 +1544,7 @@ class SGFileManager(QtWidgets.QMainWindow):
 
                 if sceneMode:
                     dialog = fm_dialog.entityDialog(mode='shot', project=projectEntity, episode=entityItem1, sequence=entityItem2, shot=entityName, parent=self)
-                    result = dialog.exec_()
+                    result = dialog.ui.exec_()
 
                     if result:
                         print 'dialog OK'
