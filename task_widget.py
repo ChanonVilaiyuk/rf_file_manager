@@ -1,17 +1,18 @@
-from PySide import QtCore
-from PySide import QtGui
+from Qt import QtCore
+from Qt import QtWidgets
+from Qt import QtGui
 
-class TaskWidget(QtGui.QWidget) :
+class TaskWidget(QtWidgets.QWidget) :
 	def __init__(self, parent = None) :
 		super(TaskWidget, self).__init__(parent)
 		# set label
-		self.allLayout = QtGui.QHBoxLayout()
+		self.allLayout = QtWidgets.QHBoxLayout()
 
-		self.text1Label = QtGui.QLabel()
-		self.text2Label = QtGui.QLabel()
+		self.text1Label = QtWidgets.QLabel()
+		self.text2Label = QtWidgets.QLabel()
 
 		# set icon
-		self.iconQLabel = QtGui.QLabel()
+		self.iconQLabel = QtWidgets.QLabel()
 
 
 		self.allLayout.addWidget(self.iconQLabel, 0, 0)
@@ -30,7 +31,7 @@ class TaskWidget(QtGui.QWidget) :
 		self.setLayout(self.allLayout)
 
 		# set font
-		# font = QtGui.QFont()
+		# font = QtWidgets.QFont()
 		# font.setPointSize(9)
 		# # font.setWeight(70)
 		# font.setBold(True)

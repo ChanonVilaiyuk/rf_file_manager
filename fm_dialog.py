@@ -1,4 +1,4 @@
-from PySide import QtGui, QtCore
+from Qt import QtWidgets, QtCore
 import fm_dialog_ui as ui
 reload(ui)
 import maya.cmds as mc
@@ -9,10 +9,10 @@ logger.addHandler(logging.NullHandler)
 
 from startup import config
 
-class entityDialog(QtGui.QDialog):
+class entityDialog(QtWidgets.QDialog):
 
 	def __init__(self, mode='', project=None, asset='', episode='', sequence='', shot='', parent = None):
-		QtGui.QDialog.__init__(self, parent)
+		QtWidgets.QDialog.__init__(self, parent)
 		self.ui = ui.Ui_Dialog()
 		self.ui.setupUi(self)
 
@@ -80,13 +80,13 @@ class entityDialog(QtGui.QDialog):
 		self.resize(300, 100)
 
 	def closeUI(self, *args):
-		self.done(QtGui.QDialog.Rejected)
+		self.done(QtWidgets.QDialog.Rejected)
 
 	def run(self, *args):
 		if self.mode in ['sequence', 'shot', 'episode']:
 			if str(self.ui.lineEdit1_lineEdit.text()) and str(self.ui.lineEdit2_lineEdit.text()):
 				self.data = {str(self.ui.lineEdit1_lineEdit.text()): str(self.ui.lineEdit2_lineEdit.text())}
-				self.done(QtGui.QDialog.Accepted)
+				self.done(QtWidgets.QDialog.Accepted)
 
 			else:
 				self.ui.label3_label.setVisible(True)
@@ -94,7 +94,7 @@ class entityDialog(QtGui.QDialog):
 
 		if self.mode in ['asset']:
 			if str(self.ui.lineEdit1_lineEdit.text()):
-				self.done(QtGui.QDialog.Accepted)
+				self.done(QtWidgets.QDialog.Accepted)
 
 	def set_preset(self, *args):
 		self.ui.preset_frame.setVisible(self.ui.preset_checkBox.isChecked())
@@ -124,7 +124,7 @@ class entityDialog(QtGui.QDialog):
 					sgname = '%s_%s_%s' % (self.project.get('sg_project_code'), self.episode, shortCode)
 					self.data.update({shortCode: sgname})
 
-		self.done(QtGui.QDialog.Accepted)
+		self.done(QtWidgets.QDialog.Accepted)
 
 
 	def check_preset(self, *args):
