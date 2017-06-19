@@ -82,7 +82,7 @@ class SGFileManager(QtWidgets.QMainWindow):
         self.ui.show()
         # self.ui.setupUi(self)
         # self.ui.show()
-        self.setWindowTitle('SGFileManager v.0.0.9 set default to Gpu_pr')
+        self.ui.setWindowTitle('SGFileManager v.0.0.9 set default to Gpu_pr')
 
         self.asset = config.asset
         self.scene = config.scene
@@ -121,9 +121,9 @@ class SGFileManager(QtWidgets.QMainWindow):
 
     def set_root(self):
         try:
-            self.rootWork = config.rootWork
-            self.rootPubl = config.rootPubl
-            self.rootProd = config.rootProd
+            self.rootWork = os.environ[config.RFPROJECT]
+            self.rootPubl = os.environ[config.RFPUBL]
+            self.rootProd = os.environ[config.RFPROD]
         except KeyError as e:
             logger.error('No root define %s' % e)
 
@@ -1708,6 +1708,9 @@ class SGFileManager(QtWidgets.QMainWindow):
         refDir = asset.libPath()
         refPath = '%s/%s' % (refDir, referenceFile)
         asm = False
+
+        # namespace should be asset_001 without res 
+        res = None
 
         if '_%s' % config.asmSuffix in referenceFile:
             asm = True
