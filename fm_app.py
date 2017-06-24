@@ -7,6 +7,8 @@
 # v.0.0.7 asset / shot match open scene selection
 # v.0.0.8 support reference assembly
 # v.0.0.9 set default to Gpu_pr
+# v.0.1.0 change name to task name and global version. 
+# v.0.1.0 highlight latest file by version and date
 
 #Import python modules
 import sys, os, re, shutil, random
@@ -163,6 +165,9 @@ class SGFileManager(QtWidgets.QMainWindow):
         self.ui.lo_radioButton.clicked.connect(partial(self.res_signal, 'lo'))
         self.ui.md_radioButton.clicked.connect(partial(self.res_signal, 'md'))
         self.ui.hi_radioButton.clicked.connect(partial(self.res_signal, 'hi'))
+
+        self.ui.date_radioButton.clicked.connect(partial(self.set_work_files))
+        self.ui.version_radioButton.clicked.connect(partial(self.set_work_files))
 
         # listWidget
         self.ui.ui1_listWidget.itemSelectionChanged.connect(self.ui1_signal)
@@ -460,7 +465,7 @@ class SGFileManager(QtWidgets.QMainWindow):
         self.ui.step_comboBox.setVisible(False)
         self.ui.dept_label.setVisible(False)
         self.ui.entity_listWidget.setSortingEnabled(True)
-        self.ui.file_listWidget.setSortingEnabled(True)
+        # self.ui.file_listWidget.setSortingEnabled(True)
         self.ui.ui2_listWidget.setSortingEnabled(True)
 
     def override_filename(self):
@@ -995,6 +1000,7 @@ class SGFileManager(QtWidgets.QMainWindow):
             # workspaces = file_utils.listFolder(path)
             workspaces = self.get_workspace_dir(path)
             if workspaces:
+                workspaces = [a.lower() for a in workspaces]
                 rootApp = '%s/%s' % (app, selRoot)
                 self.ui.work_comboBox.addItems(workspaces)
                 index = workspaces.index(rootApp) if rootApp in workspaces else 0
@@ -1012,6 +1018,7 @@ class SGFileManager(QtWidgets.QMainWindow):
                 entity = selectedItem.data(QtCore.Qt.UserRole)
                 if entity:
                     tasks = sg_process.get_tasks(entity)
+                    tasks = self.sorted_task(tasks)
                     if assetMode:
                         tasks = self.filterTask(tasks, res)
 
@@ -1022,7 +1029,7 @@ class SGFileManager(QtWidgets.QMainWindow):
                         # set current selection
                         pathInfo = path_info.PathInfo()
 
-                        for row, task in enumerate(sorted(tasks)):
+                        for row, task in enumerate(tasks):
                             taskIcon = config.sgIconMap.get(task['sg_status_list'])
                             assignees = [a.get('name') for a in task['task_assignees']]
                             assigneesStr = (',').join(assignees)
@@ -1087,7 +1094,21 @@ class SGFileManager(QtWidgets.QMainWindow):
             if os.path.exists(path):
                 files = file_utils.listFile(path)
                 if self.ui.taskFilter_checkBox.isChecked():
-                    files = [a for a in files if filterRes in a]
+                    # files = [a for a in files if filterRes in a] # comment this to use a task name as a filter
+                    files = [a for a in files if asset.task in a]
+
+                # find sort order 
+                filesSortDate, filesSortVer = self.sort_files(path, files)
+
+                if self.ui.date_radioButton.isChecked(): 
+                    files = filesSortDate
+
+                if self.ui.version_radioButton.isChecked(): 
+                    files = filesSortVer
+
+                colorOK = [0, 140, 0]
+                colorLatestDate = [160, 120, 60]
+                colorLatestVersion = [0, 40, 140]
 
                 for eachFile in files:
                     item = QtWidgets.QListWidgetItem(self.ui.file_listWidget)
@@ -1098,13 +1119,48 @@ class SGFileManager(QtWidgets.QMainWindow):
                     iconWidget.addPixmap(QtGui.QPixmap(icon.maya),QtGui.QIcon.Normal,QtGui.QIcon.Off)
                     item.setIcon(iconWidget)
 
+                    # set color for latest file 
+                    if eachFile == filesSortDate[0]: 
+                        item.setBackground(QtGui.QColor(colorLatestDate[0], colorLatestDate[1], colorLatestDate[2]))
+                    if eachFile == filesSortVer[0]: 
+                        item.setBackground(QtGui.QColor(colorLatestVersion[0], colorLatestVersion[1], colorLatestVersion[2]))
+                    if eachFile == filesSortDate[0] == filesSortVer[0]: 
+                        item.setBackground(QtGui.QColor(colorOK[0], colorOK[1], colorOK[2]))
+
                 saveFilename = self.get_save_filename(projectEntity, mode, path, asset)
 
-            self.ui.file_listWidget.sortItems(QtCore.Qt.DescendingOrder)
+            # self.ui.file_listWidget.sortItems(QtCore.Qt.DescendingOrder)
             self.set_path(filename=saveFilename)
 
 
     # utils
+    def sort_files(self, path, files): 
+        filePaths = ['%s/%s' % (path, a) for a in files]
+        fileDate = dict()
+        fileVer = dict()
+        fileSortDate = []
+        fileSortVer = []
+
+        if files: 
+            # sort by date 
+            for each in filePaths: 
+                date = os.path.getmtime(each)
+                fileDate.update({date: os.path.basename(each)})
+            fileSortDate = [fileDate[a] for a in sorted(fileDate.keys())[::-1]]
+
+            # sort by version 
+            for each in files: 
+                ver = file_utils.find_version(each)
+                if ver in fileVer.keys(): 
+                    fileVer[ver].append(each)
+                else: 
+                    fileVer.update({ver: [each]})
+
+            for each in sorted(fileVer.keys())[::-1]: 
+                fileSortVer = fileSortVer + fileVer[each]
+
+        return fileSortDate, fileSortVer
+
     def get_workspace_dir(self, path):
         dirs = file_utils.listFolder(path)
         workspaceDir = []
@@ -1184,20 +1240,29 @@ class SGFileManager(QtWidgets.QMainWindow):
             # nameElems.append(projectCode)
         if mode == self.asset:
             taskEntity = self.ui.task_listWidget.currentItem()
-            taskName = taskEntity.data(QtCore.Qt.UserRole).get('content')
-            filterRes = '%s_%s' % (asset.step, self.get_asset_res())
-            allFiles = [a for a in allFiles if filterRes in a]
 
-            # add step name
-            # nameElems.append(asset.assetName(step=True))
-            # add task name
-            nameElems.append(asset.assetName(step=True))
-            if any(a for a in self.allRes if a in taskName):
-                nameElems.append(self.get_asset_res())
+            if taskEntity: 
+                taskName = taskEntity.data(QtCore.Qt.UserRole).get('content')
+                filterRes = '%s_%s' % (asset.step, self.get_asset_res())
+                # allFiles = [a for a in allFiles if filterRes in a] # comment this line to user global versioning
+                # add step name
+                # nameElems.append(asset.assetName(step=True))
+                # add task name
+                # nameElems.append(asset.assetName(step=True))
+                nameElems.append(asset.assetName(step=False))
+                nameElems.append(taskName) # add task name
+                # comment below to not add res name
+                # if any(a for a in self.allRes if a in taskName):
+                #     nameElems.append(self.get_asset_res())
         if mode == self.scene:
             if projectCode:
-                nameElems.append(projectCode)
-                nameElems.append(asset.shotName(step=True))
+                taskEntity = self.ui.task_listWidget.currentItem()
+
+                if taskEntity: 
+                    taskName = taskEntity.data(QtCore.Qt.UserRole).get('content')
+                    nameElems.append(projectCode)
+                    nameElems.append(asset.shotName(step=False))
+                    nameElems.append(taskName)
 
         version = file_utils.find_next_version(allFiles)
         nameElems.append(version)
@@ -1222,6 +1287,22 @@ class SGFileManager(QtWidgets.QMainWindow):
             self.ui.save_pushButton.setEnabled(False)
             if os.path.exists(path_info.PathInfo(path).absPath):
                 self.ui.save_pushButton.setEnabled(True)
+
+    def sorted_task(self, taskEntities): 
+        mode = self.get_mode_ui(entity=True)
+        tasks = config.sgSortTask.get(mode)
+        sgTasks = [a.get('content') for a in taskEntities]
+        taskNotInOrder = [a for a in sgTasks if not a in tasks]
+        tasks = tasks + taskNotInOrder
+        orderTasks = []
+
+        for task in tasks: 
+            taskEntity = [a for a in taskEntities if a.get('content') == task]
+
+            if taskEntity: 
+                orderTasks.append(taskEntity[0])
+        
+        return orderTasks
 
     # file commands
 
